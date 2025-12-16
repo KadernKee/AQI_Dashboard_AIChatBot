@@ -1,0 +1,1393 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQI Prediction Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0f0f1a; min-height: 100vh; color: white; }
+        
+        /* ==================== DASHBOARD STYLES ==================== */
+        .dashboard { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo { font-size: 1.5em; font-weight: 700; }
+        .logo span { color: #3498db; }
+        .header-info { text-align: right; font-size: 0.9em; opacity: 0.7; }
+        
+        .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+        .left-panel { display: flex; flex-direction: column; gap: 15px; }
+        
+        .today-panel { background: linear-gradient(135deg, #27ae60, #2ecc71); border-radius: 24px; padding: 30px; text-align: center; position: relative; overflow: hidden; }
+        .today-panel::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); animation: pulse 4s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.1); opacity: 0.3; } }
+        .today-content { position: relative; z-index: 1; }
+        .today-emoji { font-size: 3em; margin-bottom: 10px; }
+        .today-label { font-size: 1em; opacity: 0.9; margin-bottom: 5px; }
+        .today-value { font-size: 5em; font-weight: 700; line-height: 1; margin-bottom: 10px; }
+        .today-category { font-size: 1.4em; font-weight: 600; margin-bottom: 12px; }
+        .today-advice { font-size: 0.9em; opacity: 0.95; line-height: 1.4; margin-bottom: 15px; }
+        .today-comparison { background: rgba(0,0,0,0.2); border-radius: 12px; padding: 10px; font-size: 0.85em; }
+        
+        .mini-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .mini-stat { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .mini-stat-value { font-size: 1.5em; font-weight: 700; margin-bottom: 3px; }
+        .mini-stat-label { font-size: 0.75em; opacity: 0.6; }
+        
+        .quick-actions { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 15px; border: 1px solid rgba(255,255,255,0.08); }
+        .quick-actions-title { font-size: 0.9em; font-weight: 600; margin-bottom: 12px; opacity: 0.8; }
+        .action-item { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 10px; margin-bottom: 8px; font-size: 0.85em; }
+        .action-item:last-child { margin-bottom: 0; }
+        .action-icon { font-size: 1.3em; }
+        .action-text { flex: 1; }
+        .action-status { font-size: 0.75em; padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+        .status-safe { background: #27ae60; }
+        .status-caution { background: #f1c40f; color: #333; }
+        .status-danger { background: #e74c3c; }
+        
+        .right-panel { display: flex; flex-direction: column; gap: 20px; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tab { padding: 12px 25px; background: rgba(255,255,255,0.05); border: none; border-radius: 10px; color: white; font-size: 0.95em; cursor: pointer; transition: all 0.3s; }
+        .tab:hover { background: rgba(255,255,255,0.1); }
+        .tab.active { background: #3498db; }
+        
+        .forecast-section { background: rgba(255,255,255,0.03); border-radius: 20px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .section-title { font-size: 1.2em; font-weight: 600; }
+        .trend-badge { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 20px; font-size: 0.9em; }
+        
+        .forecast-cards { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 20px; }
+        .day-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 15px 8px; text-align: center; border: 2px solid transparent; transition: all 0.3s; cursor: pointer; }
+        .day-card:hover { transform: translateY(-3px); background: rgba(255,255,255,0.08); }
+        .day-card.best { border-color: #27ae60; box-shadow: 0 0 20px rgba(39, 174, 96, 0.3); }
+        .day-card.worst { border-color: #e74c3c; box-shadow: 0 0 20px rgba(231, 76, 60, 0.3); }
+        .day-card.today { border-color: #3498db; background: rgba(52, 152, 219, 0.15); }
+        .day-name { font-size: 0.75em; opacity: 0.6; margin-bottom: 3px; }
+        .day-date { font-size: 0.85em; margin-bottom: 10px; opacity: 0.8; }
+        .day-value { font-size: 1.6em; font-weight: 700; margin-bottom: 8px; }
+        .day-category { font-size: 0.65em; padding: 4px 8px; border-radius: 10px; display: inline-block; }
+        .day-badge { font-size: 0.7em; margin-top: 8px; padding: 3px 8px; border-radius: 8px; }
+        
+        .chart-container { background: rgba(0,0,0,0.2); border-radius: 12px; padding: 15px; }
+        
+        .cat-good { background: #27ae60; color: white; }
+        .cat-moderate { background: #f1c40f; color: #333; }
+        .cat-unhealthy-sg { background: #e67e22; color: white; }
+        .cat-unhealthy { background: #e74c3c; color: white; }
+        
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .section { background: rgba(255,255,255,0.03); border-radius: 20px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .pollutant-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .pollutant-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; }
+        .pollutant-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .pollutant-name { font-weight: 600; }
+        .pollutant-value { font-size: 1.3em; font-weight: 700; }
+        .pollutant-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .pollutant-fill { height: 100%; border-radius: 3px; }
+        .pollutant-status { font-size: 0.75em; margin-top: 5px; opacity: 0.7; }
+        
+        .health-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .health-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; display: flex; align-items: flex-start; gap: 12px; }
+        .health-icon { font-size: 1.8em; }
+        .health-content { flex: 1; }
+        .health-title { font-weight: 600; margin-bottom: 4px; font-size: 0.95em; }
+        .health-text { font-size: 0.8em; opacity: 0.7; line-height: 1.4; }
+        
+        .note-box { background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 12px; padding: 15px; margin-top: 15px; font-size: 0.85em; }
+        .note-box-title { font-weight: 600; margin-bottom: 5px; color: #3498db; }
+        
+        .footer { text-align: center; padding: 30px; opacity: 0.5; font-size: 0.85em; margin-top: 20px; }
+        
+        .stat-good { color: #27ae60; }
+        .stat-moderate { color: #f1c40f; }
+        .stat-bad { color: #e74c3c; }
+        .stat-blue { color: #3498db; }
+        
+        .hidden { display: none; }
+        
+        @media (max-width: 1200px) { .main-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { 
+            .forecast-cards { grid-template-columns: repeat(4, 1fr); } 
+            .bottom-grid { grid-template-columns: 1fr; }
+        }
+        
+        /* ==================== CHATBOT STYLES ==================== */
+        .chat-fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 65px;
+            height: 65px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 5px 25px rgba(52, 152, 219, 0.4);
+            transition: all 0.3s;
+            z-index: 1000;
+            border: none;
+            color: white;
+            font-size: 1.8em;
+        }
+        
+        .chat-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 35px rgba(52, 152, 219, 0.6);
+        }
+        
+        .chat-fab.active {
+            transform: rotate(90deg);
+        }
+        
+        .chat-notification {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background: #e74c3c;
+            border-radius: 50%;
+            font-size: 0.5em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: bounce 1s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        
+        .chat-panel {
+            position: fixed;
+            bottom: 110px;
+            right: 30px;
+            width: 400px;
+            height: 550px;
+            background: rgba(15, 15, 26, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            transform: scale(0) translateY(20px);
+            transform-origin: bottom right;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .chat-panel.open {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+        
+        .chat-header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .chat-header-info {
+            flex: 1;
+        }
+        
+        .chat-header-title {
+            font-weight: 600;
+            font-size: 1em;
+        }
+        
+        .chat-header-status {
+            font-size: 0.75em;
+            opacity: 0.8;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .chat-header-status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #2ecc71;
+            border-radius: 50%;
+        }
+        
+        .chat-close {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        .chat-close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .chat-message {
+            max-width: 85%;
+            padding: 12px 15px;
+            border-radius: 15px;
+            line-height: 1.5;
+            font-size: 0.9em;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .bot-message {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 4px;
+        }
+        
+        .user-message {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message-time {
+            font-size: 0.65em;
+            opacity: 0.5;
+            margin-top: 5px;
+        }
+        
+        .chat-quick-btns {
+            padding: 10px 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2);
+        }
+        
+        .chat-quick-btn {
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 15px;
+            color: white;
+            font-size: 0.75em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .chat-quick-btn:hover {
+            background: rgba(52, 152, 219, 0.4);
+            border-color: #3498db;
+        }
+        
+        .chat-input-area {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            color: white;
+            font-size: 0.9em;
+            outline: none;
+        }
+        
+        .chat-input:focus {
+            border-color: #3498db;
+        }
+        
+        .chat-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .chat-send {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+        
+        .chat-send:hover {
+            transform: scale(1.1);
+        }
+        
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 10px;
+        }
+        
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 100% { opacity: 0.3; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-3px); }
+        }
+        
+        /* Chat response styles */
+        .chat-aqi-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 12px;
+            margin: 8px 0;
+        }
+        
+        .chat-aqi-value {
+            font-size: 2em;
+            font-weight: 700;
+        }
+        
+        .chat-aqi-good { color: #27ae60; }
+        .chat-aqi-moderate { color: #f1c40f; }
+        .chat-aqi-unhealthy { color: #e74c3c; }
+        
+        .chat-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        
+        .chat-badge-good { background: #27ae60; }
+        .chat-badge-moderate { background: #f1c40f; color: #333; }
+        .chat-badge-unhealthy { background: #e74c3c; }
+        
+        .chat-data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 0.8em;
+        }
+        
+        .chat-data-table th, .chat-data-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .chat-data-table th {
+            background: rgba(52, 152, 219, 0.3);
+            font-weight: 600;
+        }
+        
+        .chat-info-box {
+            background: rgba(52, 152, 219, 0.2);
+            border-left: 3px solid #3498db;
+            padding: 10px 12px;
+            margin: 8px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85em;
+        }
+        
+        .chat-tip-box {
+            background: rgba(39, 174, 96, 0.2);
+            border-left: 3px solid #27ae60;
+            padding: 10px 12px;
+            margin: 8px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85em;
+        }
+        
+        .chat-warning-box {
+            background: rgba(241, 196, 15, 0.2);
+            border-left: 3px solid #f1c40f;
+            padding: 10px 12px;
+            margin: 8px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85em;
+        }
+        
+        .chat-highlight { color: #3498db; font-weight: 600; }
+        .chat-success { color: #27ae60; }
+        .chat-warning { color: #f1c40f; }
+        .chat-danger { color: #e74c3c; }
+        
+        .chat-rec-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 8px 0;
+        }
+        
+        .chat-rec-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8em;
+        }
+        
+        .chat-rec-icon { font-size: 1.2em; }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 5px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+        
+        @media (max-width: 500px) {
+            .chat-panel {
+                width: calc(100% - 20px);
+                right: 10px;
+                bottom: 100px;
+                height: 70vh;
+            }
+            
+            .chat-fab {
+                right: 20px;
+                bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ==================== DASHBOARD ==================== -->
+    <div class="dashboard">
+        <div class="header">
+            <div class="logo">AQI<span>Predict</span></div>
+            <div class="header-info">
+                <div>Last Updated: December 16, 2025 12:59</div>
+                <div>Model: GRU (Accuracy: 87.91%)</div>
+            </div>
+        </div>
+        
+        <div class="main-grid">
+            <div class="left-panel">
+                <div class="today-panel">
+                    <div class="today-content">
+                        <div class="today-emoji">😊</div>
+                        <div class="today-label">Today's Air Quality</div>
+                        <div class="today-value">30</div>
+                        <div class="today-category">Good</div>
+                        <div class="today-advice">Air quality is excellent. Perfect for outdoor activities!</div>
+                        <div class="today-comparison">
+                            Model Accuracy: <strong>87.91%</strong> | 
+                            Avg Error: <strong>6.3</strong> AQI
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mini-stats">
+                    <div class="mini-stat">
+                        <div class="mini-stat-value stat-blue">6.3</div>
+                        <div class="mini-stat-label">Avg Error (AQI)</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-value stat-good">87.91%</div>
+                        <div class="mini-stat-label">Model Accuracy</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-value stat-moderate">29</div>
+                        <div class="mini-stat-label">Avg Next 7 Days</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-value" style="color: #9b59b6;">7/7</div>
+                        <div class="mini-stat-label">Good Days (Past)</div>
+                    </div>
+                </div>
+                
+                <div class="quick-actions">
+                    <div class="quick-actions-title">⚡ Today's Recommendations</div>
+                    <div class="action-item">
+                        <span class="action-icon">🏃</span>
+                        <span class="action-text">Outdoor Exercise</span>
+                        <span class="action-status status-safe">
+                            Safe
+                        </span>
+                    </div>
+                    <div class="action-item">
+                        <span class="action-icon">🪟</span>
+                        <span class="action-text">Open Windows</span>
+                        <span class="action-status status-safe">
+                            Yes
+                        </span>
+                    </div>
+                    <div class="action-item">
+                        <span class="action-icon">😷</span>
+                        <span class="action-text">Wear Mask</span>
+                        <span class="action-status status-safe">
+                            Not Needed
+                        </span>
+                    </div>
+                    <div class="action-item">
+                        <span class="action-icon">👶</span>
+                        <span class="action-text">Children Outdoor</span>
+                        <span class="action-status status-safe">
+                            Safe
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('future')">🔮 Next 7 Days Forecast</button>
+                    <button class="tab" onclick="showTab('past')">📊 Past 7 Days (Accuracy)</button>
+                </div>
+                
+                <div id="future-section" class="forecast-section">
+                    <div class="section-header">
+                        <div class="section-title">🔮 Next 7 Days Forecast</div>
+                        <div class="trend-badge" style="color: #3498db;">
+                            <span>📅</span>
+                            <span>Dec 17 - Dec 23</span>
+                        </div>
+                    </div>
+                    <div class="forecast-cards" id="future-cards"></div>
+                    <div class="chart-container">
+                        <div id="future-chart"></div>
+                    </div>
+                    <div class="note-box">
+                        <div class="note-box-title">📌 Note</div>
+                        This is a <strong>forecast</strong> based on the model's prediction. Actual AQI values will only be known after these dates pass.
+                    </div>
+                </div>
+                
+                <div id="past-section" class="forecast-section hidden">
+                    <div class="section-header">
+                        <div class="section-title">📊 Past 7 Days: Predicted vs Actual</div>
+                        <div class="trend-badge" style="color: #3498db">
+                            <span>➡️</span>
+                            <span>Stable (+1.8 AQI)</span>
+                        </div>
+                    </div>
+                    <div class="forecast-cards" id="past-cards"></div>
+                    <div class="chart-container">
+                        <div id="past-chart"></div>
+                    </div>
+                    <div class="note-box">
+                        <div class="note-box-title">📌 Model Accuracy</div>
+                        This shows how well the model <strong>predicted past data</strong>. The closer the blue line (Predicted) is to the red line (Actual), the better the model performs.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bottom-grid">
+            <div class="section">
+                <div class="section-title" style="margin-bottom: 15px;">🧪 Current Pollutant Levels</div>
+                <div class="pollutant-grid">
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">NO₂</span>
+                            <span class="pollutant-value">22.5</span>
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.6;">Nitrogen Dioxide (ppb)</div>
+                        <div class="pollutant-bar">
+                            <div class="pollutant-fill" style="width: 42%; background: #27ae60;"></div>
+                        </div>
+                        <div class="pollutant-status">Safe limit: 53 ppb</div>
+                    </div>
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">SO₂</span>
+                            <span class="pollutant-value">7.7</span>
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.6;">Sulfur Dioxide (ppb)</div>
+                        <div class="pollutant-bar">
+                            <div class="pollutant-fill" style="width: 22%; background: #27ae60;"></div>
+                        </div>
+                        <div class="pollutant-status">Safe limit: 35 ppb</div>
+                    </div>
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">CO</span>
+                            <span class="pollutant-value">0.67</span>
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.6;">Carbon Monoxide (ppm)</div>
+                        <div class="pollutant-bar">
+                            <div class="pollutant-fill" style="width: 15%; background: #27ae60;"></div>
+                        </div>
+                        <div class="pollutant-status">Safe limit: 4.4 ppm</div>
+                    </div>
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">O₃</span>
+                            <span class="pollutant-value">45.0</span>
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.6;">Ozone (ppb)</div>
+                        <div class="pollutant-bar">
+                            <div class="pollutant-fill" style="width: 64%; background: #27ae60;"></div>
+                        </div>
+                        <div class="pollutant-status">Safe limit: 70 ppb</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title" style="margin-bottom: 15px;">💚 Health Recommendations</div>
+                <div class="health-grid">
+                    <div class="health-card">
+                        <div class="health-icon">🏃</div>
+                        <div class="health-content">
+                            <div class="health-title">Outdoor Exercise</div>
+                            <div class="health-text" id="tip-exercise"></div>
+                        </div>
+                    </div>
+                    <div class="health-card">
+                        <div class="health-icon">😷</div>
+                        <div class="health-content">
+                            <div class="health-title">Mask Advisory</div>
+                            <div class="health-text" id="tip-mask"></div>
+                        </div>
+                    </div>
+                    <div class="health-card">
+                        <div class="health-icon">🪟</div>
+                        <div class="health-content">
+                            <div class="health-title">Ventilation</div>
+                            <div class="health-text" id="tip-vent"></div>
+                        </div>
+                    </div>
+                    <div class="health-card">
+                        <div class="health-icon">👶</div>
+                        <div class="health-content">
+                            <div class="health-title">Children & Elderly</div>
+                            <div class="health-text" id="tip-sensitive"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>AQI Prediction System | Final Year Project | SDG 3: Good Health and Well-Being</p>
+            <p>Model: GRU (Gated Recurrent Unit) | Dataset: US Pollution Data (2000-2016) | Split: 70/15/15</p>
+        </div>
+    </div>
+    
+    <!-- ==================== FLOATING CHATBOT ==================== -->
+    <button class="chat-fab" id="chatFab" onclick="toggleChat()">
+        💬
+        <div class="chat-notification" id="chatNotification">1</div>
+    </button>
+    
+    <div class="chat-panel" id="chatPanel">
+        <div class="chat-header">
+            <div class="chat-avatar">🤖</div>
+            <div class="chat-header-info">
+                <div class="chat-header-title">AQI Assistant</div>
+                <div class="chat-header-status">Online</div>
+            </div>
+            <button class="chat-close" onclick="toggleChat()">✕</button>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages"></div>
+        
+        <div class="chat-quick-btns">
+            <button class="chat-quick-btn" onclick="sendChatMessage('Today\'s AQI')">📊 Today</button>
+            <button class="chat-quick-btn" onclick="sendChatMessage('Last 7 days')">📅 Past Week</button>
+            <button class="chat-quick-btn" onclick="sendChatMessage('Next 7 days')">🔮 Forecast</button>
+            <button class="chat-quick-btn" onclick="sendChatMessage('Health advice')">💚 Health</button>
+            <button class="chat-quick-btn" onclick="sendChatMessage('About model')">🔬 Model</button>
+            <button class="chat-quick-btn" onclick="sendChatMessage('Help')">❓ Help</button>
+        </div>
+        
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chatInput" 
+                   placeholder="Ask about air quality..." 
+                   onkeypress="handleChatKeyPress(event)">
+            <button class="chat-send" onclick="sendChatMessage()">➤</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== DASHBOARD DATA ====================
+        const pastDates = ["Dec 10", "Dec 11", "Dec 12", "Dec 13", "Dec 14", "Dec 15", "Dec 16"];
+        const pastDayNames = ["Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday"];
+        const futureDates = ["Dec 17", "Dec 18", "Dec 19", "Dec 20", "Dec 21", "Dec 22", "Dec 23"];
+        const futureDayNames = ["Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday"];
+        
+        const pastData = [{"date": "Dec 10", "day_name": "Wednesday", "day_short": "Wed", "predicted": 27.8, "actual": 26.0, "error": 1.8, "is_today": false}, {"date": "Dec 11", "day_name": "Thursday", "day_short": "Thu", "predicted": 28.6, "actual": 28.0, "error": 0.6, "is_today": false}, {"date": "Dec 12", "day_name": "Friday", "day_short": "Fri", "predicted": 29.4, "actual": 21.0, "error": 8.4, "is_today": false}, {"date": "Dec 13", "day_name": "Saturday", "day_short": "Sat", "predicted": 29.1, "actual": 22.0, "error": 7.1, "is_today": false}, {"date": "Dec 14", "day_name": "Sunday", "day_short": "Sun", "predicted": 29.2, "actual": 14.0, "error": 15.2, "is_today": false}, {"date": "Dec 15", "day_name": "Monday", "day_short": "Mon", "predicted": 29.4, "actual": 25.0, "error": 4.4, "is_today": false}, {"date": "Dec 16", "day_name": "Tuesday", "day_short": "Tue", "predicted": 29.6, "actual": 23.0, "error": 6.6, "is_today": true}];
+        const futureData = [{"date": "Dec 17", "day_name": "Wednesday", "day_short": "Wed", "predicted": 27.3}, {"date": "Dec 18", "day_name": "Thursday", "day_short": "Thu", "predicted": 30.4}, {"date": "Dec 19", "day_name": "Friday", "day_short": "Fri", "predicted": 30.3}, {"date": "Dec 20", "day_name": "Saturday", "day_short": "Sat", "predicted": 29.5}, {"date": "Dec 21", "day_name": "Sunday", "day_short": "Sun", "predicted": 27.8}, {"date": "Dec 22", "day_name": "Monday", "day_short": "Mon", "predicted": 28.0}, {"date": "Dec 23", "day_name": "Tuesday", "day_short": "Tue", "predicted": 27.9}];
+        
+        const pastBestIdx = 0;
+        const pastWorstIdx = 6;
+        const futureBestIdx = 0;
+        const futureWorstIdx = 1;
+        
+        const todayAQI = 29.6;
+        const todayActual = 23.0;
+        
+        // Model info
+        const modelInfo = {
+            name: "GRU (Gated Recurrent Unit)",
+            mae: 8.82,
+            accuracy: 87.91,
+            rmse: 13.91,
+            r2: 0.3482,
+            parameters: 12391,
+            baselineImprovement: 5.80,
+            topFeature: "O3_Mean_roll_std_7",
+            topPollutant: "O3 (Ozone)",
+            topLag: "Lag 2 (2 days)"
+        };
+        
+        // ==================== DASHBOARD FUNCTIONS ====================
+        function getCategory(aqi) {
+            if (aqi <= 50) return { name: 'Good', class: 'cat-good', color: '#27ae60' };
+            if (aqi <= 100) return { name: 'Moderate', class: 'cat-moderate', color: '#f1c40f' };
+            if (aqi <= 150) return { name: 'USG', class: 'cat-unhealthy-sg', color: '#e67e22' };
+            if (aqi <= 200) return { name: 'Unhealthy', class: 'cat-unhealthy', color: '#e74c3c' };
+            return { name: 'Hazardous', class: 'cat-hazardous', color: '#7f0000' };
+        }
+        
+        // Generate future cards
+        const futureContainer = document.getElementById('future-cards');
+        futureData.forEach((d, i) => {
+            const cat = getCategory(d.predicted);
+            const card = document.createElement('div');
+            let classes = 'day-card';
+            if (i === futureBestIdx) classes += ' best';
+            if (i === futureWorstIdx) classes += ' worst';
+            card.className = classes;
+            card.onclick = () => askAboutDay(d.day_name, 'future');
+            
+            card.innerHTML = `
+                <div class="day-name">${d.day_name}</div>
+                <div class="day-date">${d.date}</div>
+                <div class="day-value" style="color: ${cat.color}">${d.predicted}</div>
+                <div class="day-category ${cat.class}">${cat.name}</div>
+                ${i === futureBestIdx ? '<div class="day-badge" style="background: #27ae60;">Best</div>' : ''}
+                ${i === futureWorstIdx ? '<div class="day-badge" style="background: #e74c3c;">Worst</div>' : ''}
+            `;
+            futureContainer.appendChild(card);
+        });
+        
+        // Generate past cards
+        const pastContainer = document.getElementById('past-cards');
+        pastData.forEach((d, i) => {
+            const cat = getCategory(d.predicted);
+            const card = document.createElement('div');
+            let classes = 'day-card';
+            if (i === pastBestIdx && !d.is_today) classes += ' best';
+            if (i === pastWorstIdx && !d.is_today) classes += ' worst';
+            if (d.is_today) classes += ' today';
+            card.className = classes;
+            card.onclick = () => askAboutDay(d.day_name, 'past');
+            
+            card.innerHTML = `
+                <div class="day-name">${d.day_name}</div>
+                <div class="day-date">${d.date}</div>
+                <div class="day-value" style="color: ${cat.color}">${d.predicted}</div>
+                <div class="day-category ${cat.class}">${cat.name}</div>
+                <div style="font-size: 0.7em; opacity: 0.6; margin-top: 5px;">Actual: ${d.actual}</div>
+                ${d.is_today ? '<div class="day-badge" style="background: #3498db;">Today</div>' : ''}
+                ${i === pastBestIdx && !d.is_today ? '<div class="day-badge" style="background: #27ae60;">Best</div>' : ''}
+                ${i === pastWorstIdx && !d.is_today ? '<div class="day-badge" style="background: #e74c3c;">Worst</div>' : ''}
+            `;
+            pastContainer.appendChild(card);
+        });
+        
+        // Click on day card to ask chatbot
+        function askAboutDay(dayName, type) {
+            openChat();
+            setTimeout(() => {
+                if (type === 'past') {
+                    sendChatMessage(`What was ${dayName}'s AQI?`);
+                } else {
+                    sendChatMessage(`What's ${dayName}'s forecast?`);
+                }
+            }, 300);
+        }
+        
+        // Future Chart
+        const futureTrace = {
+            x: futureDates,
+            y: futureData.map(d => d.predicted),
+            name: 'Predicted AQI',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: '#3498db', width: 3 },
+            marker: { size: 10 },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(52, 152, 219, 0.2)'
+        };
+        
+        const futureLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: 'white' },
+            xaxis: { gridcolor: 'rgba(255,255,255,0.1)', title: 'Date' },
+            yaxis: { gridcolor: 'rgba(255,255,255,0.1)', title: 'Predicted AQI', range: [0, Math.max(...futureData.map(d => d.predicted)) + 20] },
+            margin: { t: 20, b: 50, l: 50, r: 20 },
+            shapes: [
+                { type: 'line', y0: 50, y1: 50, x0: futureDates[0], x1: futureDates[6], line: { color: 'rgba(39, 174, 96, 0.5)', width: 2, dash: 'dot' } },
+                { type: 'line', y0: 100, y1: 100, x0: futureDates[0], x1: futureDates[6], line: { color: 'rgba(241, 196, 15, 0.5)', width: 2, dash: 'dot' } }
+            ]
+        };
+        
+        Plotly.newPlot('future-chart', [futureTrace], futureLayout, {responsive: true});
+        
+        // Past Chart
+        const pastTrace1 = {
+            x: pastDates,
+            y: pastData.map(d => d.predicted),
+            name: 'Predicted',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: '#3498db', width: 3 },
+            marker: { size: 10 }
+        };
+        
+        const pastTrace2 = {
+            x: pastDates,
+            y: pastData.map(d => d.actual),
+            name: 'Actual',
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: '#e74c3c', width: 3, dash: 'dash' },
+            marker: { size: 10, symbol: 'square' }
+        };
+        
+        const pastLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: 'white' },
+            xaxis: { gridcolor: 'rgba(255,255,255,0.1)', title: 'Date' },
+            yaxis: { gridcolor: 'rgba(255,255,255,0.1)', title: 'AQI', range: [0, Math.max(...pastData.map(d => Math.max(d.predicted, d.actual))) + 20] },
+            legend: { x: 0, y: 1.1, orientation: 'h' },
+            margin: { t: 30, b: 50, l: 50, r: 20 }
+        };
+        
+        Plotly.newPlot('past-chart', [pastTrace1, pastTrace2], pastLayout, {responsive: true});
+        
+        // Tab switching
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.forecast-section').forEach(s => s.classList.add('hidden'));
+            
+            if (tab === 'future') {
+                document.querySelector('.tab:first-child').classList.add('active');
+                document.getElementById('future-section').classList.remove('hidden');
+            } else {
+                document.querySelector('.tab:last-child').classList.add('active');
+                document.getElementById('past-section').classList.remove('hidden');
+            }
+        }
+        
+        // Health tips
+        let exerciseTip, maskTip, ventTip, sensitiveTip;
+        if (todayAQI <= 50) {
+            exerciseTip = "Perfect conditions! All outdoor activities are safe.";
+            maskTip = "No mask needed. Enjoy the fresh air!";
+            ventTip = "Open windows freely for natural ventilation.";
+            sensitiveTip = "Safe for all including children and elderly.";
+        } else if (todayAQI <= 100) {
+            exerciseTip = "Generally safe. Sensitive individuals take shorter sessions.";
+            maskTip = "Optional. Consider if you have respiratory conditions.";
+            ventTip = "Ventilation is fine. Monitor if symptoms occur.";
+            sensitiveTip = "May want to limit prolonged outdoor activity.";
+        } else {
+            exerciseTip = "Reduce intensity and duration. Take frequent breaks.";
+            maskTip = "N95 mask recommended for outdoor activities.";
+            ventTip = "Limit ventilation. Consider using air purifier.";
+            sensitiveTip = "Should stay indoors and avoid outdoor exposure.";
+        }
+        
+        document.getElementById('tip-exercise').textContent = exerciseTip;
+        document.getElementById('tip-mask').textContent = maskTip;
+        document.getElementById('tip-vent').textContent = ventTip;
+        document.getElementById('tip-sensitive').textContent = sensitiveTip;
+        
+        // ==================== CHATBOT FUNCTIONS ====================
+        let chatOpen = false;
+        let userName = "";
+        let waitingForName = false;
+        let firstOpen = true;
+        
+        function toggleChat() {
+            chatOpen = !chatOpen;
+            const panel = document.getElementById('chatPanel');
+            const fab = document.getElementById('chatFab');
+            const notification = document.getElementById('chatNotification');
+            
+            if (chatOpen) {
+                panel.classList.add('open');
+                fab.classList.add('active');
+                fab.innerHTML = '✕';
+                notification.style.display = 'none';
+                
+                if (firstOpen) {
+                    firstOpen = false;
+                    setTimeout(() => {
+                        addBotMessage(`
+                            <div style="font-size: 1.05em;">👋 Hi there! I'm your AQI Assistant.</div>
+                            <div style="margin-top: 8px;">I can help you with air quality predictions and health advice.</div>
+                            <div class="chat-info-box">
+                                <strong>May I know your name?</strong><br>
+                                This helps me personalize our chat!
+                            </div>
+                        `);
+                        waitingForName = true;
+                    }, 300);
+                }
+            } else {
+                panel.classList.remove('open');
+                fab.classList.remove('active');
+                fab.innerHTML = '💬';
+            }
+        }
+        
+        function openChat() {
+            if (!chatOpen) {
+                toggleChat();
+            }
+        }
+        
+        function getTimeString() {
+            return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        function addBotMessage(content) {
+            const container = document.getElementById('chatMessages');
+            const msg = document.createElement('div');
+            msg.className = 'chat-message bot-message';
+            msg.innerHTML = content + `<div class="message-time">${getTimeString()}</div>`;
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function addUserMessage(content) {
+            const container = document.getElementById('chatMessages');
+            const msg = document.createElement('div');
+            msg.className = 'chat-message user-message';
+            msg.innerHTML = content + `<div class="message-time">${getTimeString()}</div>`;
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function showTyping() {
+            const container = document.getElementById('chatMessages');
+            const typing = document.createElement('div');
+            typing.className = 'chat-message bot-message';
+            typing.id = 'typing';
+            typing.innerHTML = `
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            container.appendChild(typing);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function hideTyping() {
+            const typing = document.getElementById('typing');
+            if (typing) typing.remove();
+        }
+        
+        function getChatCategory(aqi) {
+            if (aqi <= 50) return { name: "Good", class: "good", emoji: "😊", color: "#27ae60" };
+            if (aqi <= 100) return { name: "Moderate", class: "moderate", emoji: "😐", color: "#f1c40f" };
+            if (aqi <= 150) return { name: "Unhealthy SG", class: "unhealthy", emoji: "😷", color: "#e67e22" };
+            return { name: "Unhealthy", class: "unhealthy", emoji: "🤢", color: "#e74c3c" };
+        }
+        
+        function getHealthAdvice(aqi) {
+            if (aqi <= 50) return {
+                exercise: "✅ Perfect for outdoor activities!",
+                mask: "✅ No mask needed",
+                windows: "✅ Open windows freely",
+                children: "✅ Safe for all",
+                overall: "Air quality is excellent."
+            };
+            if (aqi <= 100) return {
+                exercise: "⚠️ Sensitive individuals should limit",
+                mask: "⚠️ Optional for sensitive groups",
+                windows: "⚠️ Monitor conditions",
+                children: "⚠️ Limit prolonged activity",
+                overall: "Air quality is acceptable."
+            };
+            return {
+                exercise: "❌ Reduce outdoor activities",
+                mask: "😷 Mask recommended",
+                windows: "🪟 Keep windows closed",
+                children: "👶 Keep indoors",
+                overall: "Sensitive groups should take precautions."
+            };
+        }
+        
+        function findPastDay(query) {
+            const q = query.toLowerCase();
+            for (let d of pastData) {
+                if (q.includes(d.day_name.toLowerCase()) || q.includes(d.day_short.toLowerCase())) {
+                    return d;
+                }
+            }
+            return null;
+        }
+        
+        function findFutureDay(query) {
+            const q = query.toLowerCase();
+            for (let d of futureData) {
+                if (q.includes(d.day_name.toLowerCase()) || q.includes(d.day_short.toLowerCase())) {
+                    return d;
+                }
+            }
+            return null;
+        }
+        
+        function processChat(input) {
+            const q = input.toLowerCase().trim();
+            const greeting = userName ? `Dear ${userName}, ` : '';
+            
+            // Name handling
+            if (waitingForName) {
+                const patterns = [/my name is ([a-z]+)/i, /i am ([a-z]+)/i, /call me ([a-z]+)/i, /i'm ([a-z]+)/i, /^([a-z]+)$/i];
+                for (let p of patterns) {
+                    const m = input.match(p);
+                    if (m) {
+                        userName = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+                        waitingForName = false;
+                        return `
+                            <div style="font-size: 1.05em;">Nice to meet you, <span class="chat-highlight">${userName}</span>! 🎉</div>
+                            <div style="margin-top: 8px;">I'll remember your name. How can I help you today?</div>
+                            <div class="chat-tip-box">
+                                Try asking: "What's today's AQI?" or "Show next 7 days"
+                            </div>
+                        `;
+                    }
+                }
+                return "I didn't catch that. What's your name?";
+            }
+            
+            // Greetings
+            if (q.match(/^(hi|hello|hey)/)) {
+                if (!userName) {
+                    waitingForName = true;
+                    return `
+                        <div>👋 Hello! Welcome back to AQI Assistant.</div>
+                        <div class="chat-info-box" style="margin-top: 8px;">
+                            May I know your name?
+                        </div>
+                    `;
+                }
+                return `<div>👋 Hello, ${userName}! How can I help you today?</div>`;
+            }
+            
+            // Today's AQI
+            if (q.match(/today|current|now/) && q.match(/aqi|air|quality/)) {
+                const cat = getChatCategory(todayAQI);
+                const advice = getHealthAdvice(todayAQI);
+                return `
+                    <div>${greeting}📊 Today's AQI Report</div>
+                    <div class="chat-aqi-card">
+                        <div style="display: flex; justify-content: space-between;">
+                            <div>
+                                <div style="opacity: 0.7; font-size: 0.8em;">Predicted</div>
+                                <div class="chat-aqi-value chat-aqi-${cat.class}">${todayAQI}</div>
+                                <div class="chat-badge chat-badge-${cat.class}">${cat.emoji} ${cat.name}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="opacity: 0.7; font-size: 0.8em;">Actual</div>
+                                <div style="font-size: 1.5em; font-weight: 600;">${todayActual}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-tip-box">${advice.overall}</div>
+                `;
+            }
+            
+            // Yesterday
+            if (q.includes('yesterday')) {
+                const d = pastData[5];
+                const cat = getChatCategory(d.predicted);
+                return `
+                    <div>${greeting}📅 Yesterday (${d.day_name}, ${d.date})</div>
+                    <div class="chat-aqi-card">
+                        <table class="chat-data-table">
+                            <tr><td>Predicted</td><td><span style="color: ${cat.color}; font-weight: 600;">${d.predicted}</span> (${cat.name})</td></tr>
+                            <tr><td>Actual</td><td><strong>${d.actual}</strong></td></tr>
+                            <tr><td>Error</td><td><span class="chat-highlight">${d.error}</span> points</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            // Tomorrow
+            if (q.includes('tomorrow')) {
+                const d = futureData[0];
+                const cat = getChatCategory(d.predicted);
+                const advice = getHealthAdvice(d.predicted);
+                return `
+                    <div>${greeting}🔮 Tomorrow (${d.day_name}, ${d.date})</div>
+                    <div class="chat-aqi-card" style="text-align: center;">
+                        <div style="opacity: 0.7; font-size: 0.8em;">Forecast</div>
+                        <div class="chat-aqi-value chat-aqi-${cat.class}">${d.predicted}</div>
+                        <div class="chat-badge chat-badge-${cat.class}">${cat.emoji} ${cat.name}</div>
+                    </div>
+                    <div class="chat-tip-box">${advice.overall}</div>
+                    <div class="chat-warning-box">⚠️ This is a forecast. Actual may vary.</div>
+                `;
+            }
+            
+            // Last 7 days
+            if ((q.includes('last') || q.includes('past')) && (q.includes('7') || q.includes('week') || q.includes('days'))) {
+                const rows = pastData.map(d => `
+                    <tr${d.is_today ? ' style="background: rgba(52,152,219,0.2);"' : ''}>
+                        <td>${d.day_short}${d.is_today ? ' (Today)' : ''}</td>
+                        <td style="color: ${getChatCategory(d.predicted).color}">${d.predicted}</td>
+                        <td>${d.actual}</td>
+                        <td class="${d.error < 5 ? 'chat-success' : 'chat-warning'}">${d.error}</td>
+                    </tr>
+                `).join('');
+                
+                const avgErr = (pastData.reduce((s, d) => s + d.error, 0) / 7).toFixed(1);
+                
+                return `
+                    <div>${greeting}📅 Past 7 Days</div>
+                    <div class="chat-aqi-card" style="overflow-x: auto;">
+                        <table class="chat-data-table">
+                            <thead><tr><th>Day</th><th>Pred</th><th>Actual</th><th>Err</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                    <div class="chat-info-box">Avg Error: <span class="chat-highlight">${avgErr}</span> AQI</div>
+                `;
+            }
+            
+            // Next 7 days
+            if ((q.includes('next') || q.includes('forecast') || q.includes('future')) && (q.includes('7') || q.includes('week') || q.includes('days'))) {
+                const rows = futureData.map(d => {
+                    const cat = getChatCategory(d.predicted);
+                    return `
+                        <tr>
+                            <td>${d.day_short}</td>
+                            <td>${d.date}</td>
+                            <td style="color: ${cat.color}; font-weight: 600;">${d.predicted}</td>
+                            <td><span class="chat-badge chat-badge-${cat.class}" style="font-size: 0.7em;">${cat.name}</span></td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                return `
+                    <div>${greeting}🔮 Next 7 Days Forecast</div>
+                    <div class="chat-aqi-card" style="overflow-x: auto;">
+                        <table class="chat-data-table">
+                            <thead><tr><th>Day</th><th>Date</th><th>AQI</th><th>Category</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                    <div class="chat-warning-box">⚠️ Forecasts only. Actual values may vary.</div>
+                `;
+            }
+            
+            // Specific past day
+            const pastDay = findPastDay(q);
+            if (pastDay && (q.includes('was') || q.includes('aqi') || q.includes('air'))) {
+                const cat = getChatCategory(pastDay.predicted);
+                return `
+                    <div>${greeting}📅 ${pastDay.day_name}, ${pastDay.date} ${pastDay.is_today ? '(Today)' : '(Past)'}</div>
+                    <div class="chat-aqi-card">
+                        <table class="chat-data-table">
+                            <tr><td>Predicted</td><td><span style="color: ${cat.color}; font-weight: 600;">${pastDay.predicted}</span></td></tr>
+                            <tr><td>Actual</td><td><strong>${pastDay.actual}</strong></td></tr>
+                            <tr><td>Error</td><td><span class="chat-highlight">${pastDay.error}</span> points</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            // Specific future day
+            const futureDay = findFutureDay(q);
+            if (futureDay) {
+                const cat = getChatCategory(futureDay.predicted);
+                const advice = getHealthAdvice(futureDay.predicted);
+                return `
+                    <div>${greeting}🔮 ${futureDay.day_name}, ${futureDay.date} (Forecast)</div>
+                    <div class="chat-aqi-card" style="text-align: center;">
+                        <div class="chat-aqi-value chat-aqi-${cat.class}">${futureDay.predicted}</div>
+                        <div class="chat-badge chat-badge-${cat.class}">${cat.emoji} ${cat.name}</div>
+                    </div>
+                    <div class="chat-tip-box">${advice.overall}</div>
+                `;
+            }
+            
+            // Health
+            if (q.match(/health|exercise|mask|safe|outdoor/)) {
+                const advice = getHealthAdvice(todayAQI);
+                const cat = getChatCategory(todayAQI);
+                return `
+                    <div>${greeting}💚 Health Advice (AQI: ${todayAQI})</div>
+                    <div class="chat-rec-grid">
+                        <div class="chat-rec-card"><span class="chat-rec-icon">🏃</span>${advice.exercise}</div>
+                        <div class="chat-rec-card"><span class="chat-rec-icon">😷</span>${advice.mask}</div>
+                        <div class="chat-rec-card"><span class="chat-rec-icon">🪟</span>${advice.windows}</div>
+                        <div class="chat-rec-card"><span class="chat-rec-icon">👶</span>${advice.children}</div>
+                    </div>
+                `;
+            }
+            
+            // Model
+            if (q.match(/model|accuracy|gru|performance/)) {
+                return `
+                    <div>${greeting}🔬 Model Information</div>
+                    <div class="chat-aqi-card">
+                        <table class="chat-data-table">
+                            <tr><td>Model</td><td>${modelInfo.name}</td></tr>
+                            <tr><td>MAE</td><td><span class="chat-highlight">${modelInfo.mae}</span> AQI</td></tr>
+                            <tr><td>Accuracy</td><td><span class="chat-success">${modelInfo.accuracy}%</span></td></tr>
+                            <tr><td>R²</td><td>${modelInfo.r2}</td></tr>
+                            <tr><td>Parameters</td><td>${modelInfo.parameters.toLocaleString()}</td></tr>
+                        </table>
+                    </div>
+                    <div class="chat-info-box">
+                        Top Feature: <span class="chat-highlight">${modelInfo.topFeature}</span><br>
+                        Top Pollutant: <span class="chat-highlight">${modelInfo.topPollutant}</span>
+                    </div>
+                `;
+            }
+            
+            // What is AQI
+            if (q.includes('what is aqi') || q.includes('explain aqi')) {
+                return `
+                    <div>❓ What is AQI?</div>
+                    <div style="margin: 8px 0;">The <strong>Air Quality Index</strong> measures how clean or polluted the air is.</div>
+                    <div class="chat-aqi-card">
+                        <table class="chat-data-table">
+                            <tr style="color: #27ae60;"><td>0-50</td><td>😊 Good</td></tr>
+                            <tr style="color: #f1c40f;"><td>51-100</td><td>😐 Moderate</td></tr>
+                            <tr style="color: #e67e22;"><td>101-150</td><td>😷 Unhealthy SG</td></tr>
+                            <tr style="color: #e74c3c;"><td>151-200</td><td>🤢 Unhealthy</td></tr>
+                            <tr style="color: #8e44ad;"><td>201+</td><td>😨 Hazardous</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            // Help
+            if (q.match(/help|what can|how to/)) {
+                return `
+                    <div>${userName ? `Hi ${userName}! ` : ''}📋 I can help with:</div>
+                    <div class="chat-info-box">
+                        🌡️ <strong>AQI Info:</strong> "Today's AQI", "Yesterday", "Tomorrow"
+                    </div>
+                    <div class="chat-info-box">
+                        📅 <strong>Weekly:</strong> "Last 7 days", "Next 7 days"
+                    </div>
+                    <div class="chat-info-box">
+                        💚 <strong>Health:</strong> "Is it safe to exercise?"
+                    </div>
+                    <div class="chat-info-box">
+                        🔬 <strong>Technical:</strong> "About model", "What is AQI?"
+                    </div>
+                `;
+            }
+            
+            // Thanks
+            if (q.match(/thank|thanks/)) {
+                return `You're welcome${userName ? `, ${userName}` : ''}! 😊 Stay safe!`;
+            }
+            
+            // Bye
+            if (q.match(/bye|goodbye/)) {
+                return `Goodbye${userName ? `, ${userName}` : ''}! 👋 Check back for updates!`;
+            }
+            
+            // Default
+            return `
+                <div>I'm not sure about that${userName ? `, ${userName}` : ''}. 🤔</div>
+                <div class="chat-info-box" style="margin-top: 8px;">
+                    Try: "Today's AQI", "Next 7 days", or "Help"
+                </div>
+            `;
+        }
+        
+        function sendChatMessage(text) {
+            const input = document.getElementById('chatInput');
+            const message = text || input.value.trim();
+            
+            if (!message) return;
+            
+            addUserMessage(message);
+            input.value = '';
+            
+            showTyping();
+            
+            setTimeout(() => {
+                hideTyping();
+                const response = processChat(message);
+                addBotMessage(response);
+            }, 600 + Math.random() * 400);
+        }
+        
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+    </script>
+</body>
+</html>
